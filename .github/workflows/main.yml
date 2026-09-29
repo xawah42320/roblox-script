@@ -1,0 +1,55 @@
+name: Linux SSH (Tailscale)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  linux-ssh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Enable SSH
+        run: |
+          sudo systemctl enable ssh
+          sudo systemctl start ssh
+          sudo ufw allow 22/tcp
+
+      - name: Install Tailscale
+        run: |
+          curl -fsSL https://tailscale.com/install.sh | sudo bash
+
+      - name: Start Tailscale
+        run: |
+          sudo tailscale up --auth-key=${{ secrets.TAILSCALE_AUTHKEY }} --hostname github-linux-ssh
+
+      - name: Show Tailscale IP
+        run: |
+          sleep 10
+          sudo tailscale ip -4
+
+      - name: Create User
+        run: |
+          sudo useradd -m -s /bin/bash linuxuser
+          echo "linuxuser:LinuxUser123!" | sudo chpasswd
+          sudo usermod -aG sudo linuxuser
+          echo "linuxuser ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/linuxuser
+
+      - name: Install Dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y build-essential git curl wget screen htop net-tools gcc g++ make libpcap-dev
+
+      - name: Show Connection Info
+        run: |
+          echo "========================================"
+          echo "  LINUX SSH CONNECTION"
+          echo "========================================"
+          echo "  SSH: ssh linuxuser@$(sudo tailscale ip -4)"
+          echo "  Password: LinuxUser123!"
+          echo "========================================"
+
+      - name: Keep Runner Alive
+        run: |
+          echo "Linux VM active..."
+          while true; do sleep 300; done
